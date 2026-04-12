@@ -1,51 +1,66 @@
 import whisper
 import ollama
-
+import wave
 import sounddevice as sd
 import scipy.io.wavfile as scipy_wav
-
-import wave
 from piper import PiperVoice, SynthesisConfig
 
-def record(duration=5, sr=16000):
-    audio = sd.rec(int(duration * sr), samplerate=sr, channels=1)
-    print("Start talking for 5 seconds")
-    sd.wait()
-    scipy_wav.write("io/input.wav", sr, audio)
+class EntropyBot:
+    def __init__(self):
+        # synthesis configuration
+        self.synthesis_config = SynthesisConfig(
+            volume=0.5,             # half as loud
+            length_scale=0.5,       # higher the slower
+            noise_scale=1.0,        # more audio variation
+            noise_w_scale=1.0,      # more speaking variation
+            normalize_audio=False,  # use raw audio from voice
+        )
+        # load the model once
+        self.model = whisper.load_model("base")
+        # load the voice once
+        self.voice = PiperVoice.load("voices/en/en_US-amy-low.onnx")
 
-# infinite use
-while True:
-    record()
+        # TODO: repair the prompt
+        # initial prompt
+        #self.init_prompt = "You are my second brain, acting like a human with feelings"
 
-    # load whisper
-    model = whisper.load_model("base")
+    def record(self, duration=5, sr=16000):
+        audio = sd.rec(int(duration * sr), samplerate=sr, channels=1)
+        print("Start talking for 5 seconds")
+        sd.wait()
+        scipy_wav.write("io/input.wav", sr, audio)
 
-    # transcribe the record
-    recorded = model.transcribe("io/input.wav", verbose=True)
-    recorded_text = recorded["text"]
+    def listen(self):
+        # transcribe the record
+        recorded = self.model.transcribe("io/input.wav", verbose=True)
+        return recorded["text"]
 
-    # send to ollama
-    response = ollama.chat(model="llama3.1", messages=[
-        {"role": "user", "content": recorded_text}
-    ])
-    reply = response["message"]["content"]
+    def reply(self, recorded_text):
+        # send to ollama
+        response = ollama.chat(model="llama3.1", messages=[
+            #{"role": "user", "content": self.init_prompt},
+            {"role": "user", "content": recorded_text}
+        ])
+        reply = response["message"]["content"]
 
-    print("Reply: ", reply)
+        print("Reply: ", reply)
 
-    # synthethize the reply from ollama
-    syn_config = SynthesisConfig(
-        volume=0.5,             # half as loud
-        length_scale=0.5,       # higher the slower
-        noise_scale=1.0,        # more audio variation
-        noise_w_scale=1.0,      # more speaking variation
-        normalize_audio=False,  # use raw audio from voice
-    )
+        with wave.open("io/output.wav", "wb") as wav_file:
+            self.voice.synthesize_wav(reply, wav_file, self.synthesis_config)
 
-    voice = PiperVoice.load("voices/en/en_US-amy-low.onnx")
-    with wave.open("io/output.wav", "wb") as wav_file:
-        voice.synthesize_wav(reply, wav_file, syn_config)
+        # play the reply out loud
+        sr, data = scipy_wav.read("io/output.wav")
+        sd.play(data, sr)
+        sd.wait()
 
-    # play the reply out loud
-    sr, data = scipy_wav.read("io/output.wav")
-    sd.play(data, sr)
-    sd.wait()
+    def main(self):
+        # infinite use
+        while True:
+            self.record()
+            recorded_text = self.listen()
+            if "stop the program" in recorded_text:
+                break
+            self.reply(recorded_text)
+
+assistant = EntropyBot()
+assistant.main()
