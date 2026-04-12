@@ -1,0 +1,6 @@
+ollama
+openai-whisper
+piper-tts
+sounddevice
+scipy
+pyaudio
