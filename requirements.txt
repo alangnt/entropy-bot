@@ -3,3 +3,5 @@ openai-whisper
 piper-tts
 sounddevice
 scipy
+pymongo
+python-dotenv
