@@ -7,6 +7,9 @@ from piper import PiperVoice, SynthesisConfig
 
 class EntropyBot:
     def __init__(self):
+        # messages history
+        self.messages = []
+
         # synthesis configuration
         self.synthesis_config = SynthesisConfig(
             volume=0.5,             # half as loud
@@ -20,10 +23,6 @@ class EntropyBot:
         # load the voice once
         self.voice = PiperVoice.load("voices/en/en_US-amy-low.onnx")
 
-        # TODO: repair the prompt
-        # initial prompt
-        #self.init_prompt = "You are my second brain, acting like a human with feelings"
-
     def record(self, duration=5, sr=16000):
         audio = sd.rec(int(duration * sr), samplerate=sr, channels=1)
         print("Start talking for 5 seconds")
@@ -33,15 +32,15 @@ class EntropyBot:
     def listen(self):
         # transcribe the record
         recorded = self.model.transcribe("io/input.wav", verbose=True)
-        return recorded["text"]
+        recorded_text = recorded["text"]
+        self.messages.append({ "role": "user", "content": recorded_text })
+        return recorded_text
 
-    def reply(self, recorded_text):
+    def reply(self):
         # send to ollama
-        response = ollama.chat(model="llama3.1", messages=[
-            #{"role": "user", "content": self.init_prompt},
-            {"role": "user", "content": recorded_text}
-        ])
+        response = ollama.chat(model="llama3.1", messages=self.messages)
         reply = response["message"]["content"]
+        self.messages.append({ "role": "assistant", "content": reply })
 
         print("Reply: ", reply)
 
@@ -60,7 +59,7 @@ class EntropyBot:
             recorded_text = self.listen()
             if "stop the program" in recorded_text:
                 break
-            self.reply(recorded_text)
+            self.reply()
 
 assistant = EntropyBot()
 assistant.main()
