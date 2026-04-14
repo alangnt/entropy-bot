@@ -6,12 +6,16 @@ load_dotenv()
 
 uri = os.getenv('MONGODB_URI')
 if not uri:
-  raise ValueError("MONGODB_URI is required")
+    raise ValueError("MONGODB_URI is required")
 
 client = MongoClient(uri)
 
-try:
-  database = client.get_database("")
+def insert_conversation_line(role, content):
+    try:
+        database = client.get_database("EntropyBot")
+        collection = database.get_collection("conversations")
 
-except Exception as e:
-  raise Exception("Unable to find the document. ", e)
+        collection.insert_one({ "role": role, "content": content })
+
+    except Exception as e:
+        raise Exception("Unable to save this conversation line: ", e)
