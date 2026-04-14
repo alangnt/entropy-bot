@@ -5,6 +5,8 @@ import sounddevice as sd
 import scipy.io.wavfile as scipy_wav
 from piper import PiperVoice, SynthesisConfig
 
+from db_actions import insert_conversation_line
+
 class EntropyBot:
     def __init__(self):
         # messages history
@@ -33,6 +35,7 @@ class EntropyBot:
         # transcribe the record
         recorded = self.model.transcribe("io/input.wav", verbose=True)
         recorded_text = recorded["text"]
+        insert_conversation_line("user", recorded_text)
         self.messages.append({ "role": "user", "content": recorded_text })
         return recorded_text
 
@@ -40,6 +43,7 @@ class EntropyBot:
         # send to ollama
         response = ollama.chat(model="llama3.1", messages=self.messages)
         reply = response["message"]["content"]
+        insert_conversation_line("assistant", reply)
         self.messages.append({ "role": "assistant", "content": reply })
 
         print("Reply: ", reply)
